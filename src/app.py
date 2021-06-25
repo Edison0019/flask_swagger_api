@@ -1,47 +1,81 @@
-from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_marshmallow import Marshmallow
-from flask_restplus import Api, fields, Resource
-
-app = Flask(__name__)
-# app.config['DEBUG_MODE'] = True
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
-app.config['SECRET_KEY'] = True
-
-db = SQLAlchemy(app)
-mars = Marshmallow(app)
-api = Api()
-# api.init_app(app)
-api.init_app(app)
+# from flask import Flask, jsonify
+from flask import jsonify, request
+from flask_restx import Resource, Api, fields
+from application import app, db
+from application.models import User
+from application.serializers import UserSchema
 
 
+api = Api(app)
 
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String)
-    email = db.Column(db.String)
-    password = db.Column(db.String)
+insert_model = api.model(
+    'post',
+    {
+        'name': fields.String('enter name'),
+        'email': fields.String('enter email'),
+        'password' : fields.String('enter password')
+    }
+)
 
-class UserSchema(mars.Schema):
-    class Meta:
-        fields = ('id','name','email','password')
+delete_model = api.model('delete',{'id':fields.Integer('enter the ID of the record')})
+
+update_model = api.model(
+    'update',
+    {
+        'id': fields.Integer('enter user id'),
+        'name': fields.String('enter name'),
+        'email': fields.String('enter email'),
+        'password' : fields.String('enter password')
+    }
+)
 
 
-model = api.model('model',{
-    'name':fields.String('enter name'),
-    'email':fields.String('enter email'),
-    'password':fields.String('enter password')
-})
-
-
-
-user_sche = UserSchema()
-user_sches = UserSchema(many=True)
-
-
-@api.route('get/')
-class GetUsers(Resource):
-    # User.query.get()
+@api.route('/users')
+class HelloWorld(Resource):
     def get(self):
-        return jsonify({'response':'Ok'})
+        try:
+            user = User.query.all()
+        except:
+            return {'response': 'could not execute query'}
+        schema = UserSchema(many=True)
+        return jsonify(schema.dump(user))
+    
+    @api.expect(insert_model)
+    def post(self):
+        try:
+            # saving the response from the post action
+            rq = request.json
+            new_user = User(name=rq['name'],email=rq['email'],password=rq['password'])
+            db.session.add(new_user)
+            db.session.commit()
+        except Exception as e:
+            print(e)
+            return {'response':'could not create user'}
+        return {'response':'user created'}
+
+    @api.expect(delete_model)
+    def delete(self):
+        try:
+            user = User.query.get(request.json['id'])
+            db.session.delete(user)
+            db.session.commit()
+        except Exception as e:
+            print(e)
+            return {'response':'could not delete user'}
+        return {'response':'user removed'}
+
+    @api.expect(update_model)
+    def put(self):
+        try:
+            user = User.query.get(request.json['id'])
+            user.name = request.json['name']
+            user.email = request.json['email']
+            user.password = request.json['password']
+            db.session.commit()
+        except Exception as e:
+            print(e)
+            return {'response':'could not update user'}
+        return {'response':'user updated'}
+
+if __name__ == '__main__':
+    app.run(debug=True)

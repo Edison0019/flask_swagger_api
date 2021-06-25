@@ -128,3 +128,4 @@ dmypy.json
 # Pyre type checker
 .pyre/
 >>>>>>> 4e88a6e37834690f418e2d54b5a39477c5b7d252
+.vscode
