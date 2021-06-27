@@ -1,35 +1,12 @@
-# from flask import Flask, jsonify
 from flask import jsonify, request, session, abort
-from flask_restx import Resource, Api, fields
-from application import app, db
+from flask_restx import Resource
+from application import db, api, app
 from application.models import User, Company
 from application.serializers import CompanySchema
+from application.doc_data import insert_model
+from helpers.encrypt import EncryptPassword
 
-api = Api(app)
 company_schema = CompanySchema(many=True)
-insert_model = api.model(
-    'post',
-    {
-        'company_name': fields.String('enter name'),
-    }
-)
-
-delete_model = api.model(
-    'delete',
-    {
-        'company_id': fields.Integer('enter company Id'),
-    }
-)
-
-update_model = api.model(
-    'update',
-    {
-        'id': fields.Integer('enter user id'),
-        'name': fields.String('enter name'),
-        'email': fields.String('enter email'),
-        'password' : fields.String('enter password')
-    }
-)
 
 @api.route('/login')
 class LoginUser(Resource):
@@ -37,8 +14,11 @@ class LoginUser(Resource):
         r = request.json
         if r == None:
             return {'response':'authentication information missing'}
-        user = User.query.filter_by(email=r['email'],password=r['password'])
+        ep = EncryptPassword(r['password'])
+        user = User.query.filter_by(email=r['email'])
         if user.count() != 1:
+            return {'response':'no user found. please check user/password'}
+        elif ep.encript(user[0].password_salt) != user[0].password:
             return {'response':'no user found. please check user/password'}
         session['user_id'] = user[0].id
         return {'response':'user logged in successfully'}

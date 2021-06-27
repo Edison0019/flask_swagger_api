@@ -6,7 +6,8 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String)
     email = db.Column(db.String,nullable=False,unique=True)
-    password = db.Column(db.String,nullable=False)
+    password = db.Column(db.LargeBinary,nullable=False)
+    password_salt = db.Column(db.LargeBinary)
 
     def __repr__(self) -> str:
         return '<User %r>' % self.name
