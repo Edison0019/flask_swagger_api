@@ -1,5 +1,5 @@
 from marshmallow import Schema
 
-class UserSchema(Schema):
+class CompanySchema(Schema):
     class Meta:
-        fields = ('id','name','email','password')
+        fields = ('id','company_name','user_id','creation_date')
