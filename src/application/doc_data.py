@@ -1,5 +1,16 @@
+from attr import field
 from application import api
 from flask_restx import fields
+
+new_user = api.model(
+    'new user',
+    {
+        "name":fields.String("user name"),
+        "email":fields.String("user email"),
+        "password":fields.String("user password")
+
+    }
+)
 
 insert_model = api.model(
     'post',

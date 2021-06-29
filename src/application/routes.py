@@ -3,11 +3,35 @@ from flask_restx import Resource
 from application import db, api
 from application.models import User, Company
 from application.serializers import CompanySchema
-from application.doc_data import insert_model
+from application.doc_data import insert_model, new_user
 from helpers.encrypt import EncryptPassword
+from helpers.is_authenticated import is_user_authenticated
+from sqlalchemy.exc import IntegrityError
 
 company_schema = CompanySchema(many=True)
 
+@api.route('/create_user')
+class createUser(Resource):
+    @api.expect(new_user)
+    def post(self):
+        rq = request.json
+        #check if user already exist
+        password = EncryptPassword(rq['password'])
+        salt = password.get_salt()
+        new_user = User(
+            name=rq['name'],
+            email=rq['email'],
+            password=password.encript(salt),
+            password_salt=salt
+            )
+        db.session.add(new_user)
+        try:
+            db.session.commit()
+        except IntegrityError:
+            return {'response':'email already exists, please try another one'}
+        
+        return {'response':'user created'}
+        
 @api.route('/login')
 class LoginUser(Resource):
     def post(self):
@@ -33,9 +57,8 @@ class LogoutUser(Resource):
 
 @api.route('/companies')
 class CompanyInformation(Resource):
+    @is_user_authenticated
     def get(self):
-        if not 'user_id' in session:
-            return {'response':'please make sure to log in the system'}
         try:
             companies = Company.query.filter_by(user_id=session['user_id'])
         except:
@@ -43,10 +66,9 @@ class CompanyInformation(Resource):
         return jsonify(company_schema.dump(companies))
     
     @api.expect(insert_model)
+    @is_user_authenticated
     def post(self):
         try:
-            if not 'user_id' in session:
-                return {'response':'please make sure to log in the system'}
             # saving the response from the post action
             rq = request.json
             user =  User.query.get(session['user_id'])
@@ -58,9 +80,8 @@ class CompanyInformation(Resource):
             return {'response':'could not create company'}
         return {'response':'company created'}
 
+    @is_user_authenticated
     def delete(self):
-        if not 'user_id' in session:
-            return {'response':'please make sure to log in the system'}
         try:
             company = Company.query.get(request.json['company_id'])
             db.session.delete(company)
@@ -70,9 +91,8 @@ class CompanyInformation(Resource):
             return {'response':'could not delete company'}
         return {'response':'company removed'}
 
+    @is_user_authenticated
     def put(self):
-        if not 'user_id' in session:
-            return {'response':'please make sure to log in the system'}
         try:
             company = Company.query.get(request.json['company_id'])
             if not company:
@@ -86,11 +106,10 @@ class CompanyInformation(Resource):
 
 @api.route('/companies/<int:id>')
 class CompanySingle(Resource):
+    @is_user_authenticated
     def get(self,id):
-        if not 'user_id' in session:
-            return {'response':'please make sure to log in the system'}
-        company = Company.query.get(id)
-        if not company:
+        company = Company.query.filter_by(id=id,user_id=session['user_id'])
+        if company.count() == 0:
             return abort(404)
         company_schema = CompanySchema()
-        return jsonify(company_schema.dump(company))
+        return jsonify(company_schema.dump(company[0]))
