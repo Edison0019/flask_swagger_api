@@ -3,10 +3,10 @@ from flask_restx import Resource
 from application import db, api
 from application.models import User, Company
 from application.serializers import CompanySchema
-from application.doc_data import insert_model, new_user
-from helpers.encrypt import EncryptPassword
+from application.doc_data import insert_model, new_user, login_model
 from helpers.is_authenticated import is_user_authenticated
 from sqlalchemy.exc import IntegrityError
+from werkzeug.security import generate_password_hash, check_password_hash
 
 company_schema = CompanySchema(many=True)
 
@@ -15,45 +15,41 @@ class createUser(Resource):
     @api.expect(new_user)
     def post(self):
         rq = request.json
-        #check if user already exist
-        password = EncryptPassword(rq['password'])
-        salt = password.get_salt()
+        password = generate_password_hash(
+            rq['password'],
+            method='sha256',
+            salt_length=32
+        )
         new_user = User(
             name=rq['name'],
             email=rq['email'],
-            password=password.encript(salt),
-            password_salt=salt
-            )
+            password=password)
         db.session.add(new_user)
         try:
             db.session.commit()
         except IntegrityError:
             return {'response':'email already exists, please try another one'}
-        
         return {'response':'user created'}
         
 @api.route('/login')
 class LoginUser(Resource):
+    @api.expect(login_model)
     def post(self):
         r = request.json
-        if r == None:
+        if not r:
             return {'response':'authentication information missing'}
-        ep = EncryptPassword(r['password'])
-        user = User.query.filter_by(email=r['email'])
-        if user.count() != 1:
+        user = User.query.filter_by(email=r['email']).first()
+        if not user or not check_password_hash(user.password, r['password']):
             return {'response':'no user found. please check user/password'}
-        elif ep.encript(user[0].password_salt) != user[0].password:
-            return {'response':'no user found. please check user/password'}
-        session['user_id'] = user[0].id
+        session['user_id'] = user.id
         return {'response':'user logged in successfully'}
 
 @api.route('/logout')
 class LogoutUser(Resource):
+    @is_user_authenticated
     def get(self):
-        if 'user_id' in session:
-            session.pop('user_id')
-            return {'response':'user logged out successsfully'}
-        return {'response':'no user logged in'}
+        session.pop('user_id')
+        return {'response':'user logged out'}
 
 @api.route('/companies')
 class CompanyInformation(Resource):
@@ -61,7 +57,8 @@ class CompanyInformation(Resource):
     def get(self):
         try:
             companies = Company.query.filter_by(user_id=session['user_id'])
-        except:
+        except Exception as e:
+            print(e)
             return {'response': 'could not execute query'}
         return jsonify(company_schema.dump(companies))
     

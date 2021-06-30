@@ -16,4 +16,4 @@ db = SQLAlchemy(app)
 api = Api(app)
 
 #using alembic for tracking db changes
-migrate = Migrate(app, db,render_as_batch=True)
+migrate = Migrate(app, db, render_as_batch=True)

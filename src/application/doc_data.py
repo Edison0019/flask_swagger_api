@@ -2,6 +2,14 @@ from attr import field
 from application import api
 from flask_restx import fields
 
+login_model = api.model(
+    'login_form',
+    {
+        'email':fields.String('User email'),
+        'password':fields.String('Type password')
+    }
+)
+
 new_user = api.model(
     'new user',
     {
